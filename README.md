@@ -20,6 +20,36 @@ the night — and once a day an overnight tick resolves everything at once:
 Returning players get a **reveal card**: "While you were away..." — what fed
 it, whose comment became its instinct, what mutated, and whether it survived.
 
+**Play it live:** [demo post on r/CommuneCritter](https://www.reddit.com/r/CommuneCritter/comments/1uwc39c/a_creature_has_hatched_keep_it_alive_together/)
+· [app listing](https://developers.reddit.com/apps/commune-critter)
+· [demo video](https://youtu.be/utvbGXZr-DQ)
+
+## How to play
+
+1. **Open the post.** The splash card shows the creature's name, generation,
+   and health. Tap **Tend the creature** to open the full game view.
+2. **Spend your 3 daily actions** (they reset each day):
+   - **Feed** — instantly gives the creature +2 health, and every feed adds
+     +3 more at the overnight tick. A hungry community keeps it alive.
+   - **Mutate** — pick a trait slot (body, eyes, limbs, or aura) and vote for
+     it to change tonight. The most-voted slot mutates.
+   - **Ward** — cast a protective ward. The most neglected trait slot gets
+     shielded from tonight's mutation and decay (a shield icon shows which).
+3. **Comment on the post.** This is the secret weapon: if your comment
+   contains an instinct keyword (words about eating, fighting, protecting, or
+   chaos), the top-ranked such comment becomes the creature's **instinct**
+   for the night. The instinct biases which trait mutates and whether the
+   creature gains or loses health — and your username is credited on the
+   morning reveal card.
+4. **Come back tomorrow.** The overnight tick resolves everything: decay,
+   feeds, the winning mutation, the ward, and the instinct. The reveal card
+   shows exactly what the community did while you were away.
+5. **Keep it alive — or meet the next generation.** Health stages are visible
+   at a glance (sparkles when thriving, flies and drooping when dying, X-eyes
+   when dead). If health hits 0, the creature dies and a Generation N+1
+   successor auto-hatches in a brand-new post, inheriting two of its
+   ancestor's traits.
+
 ## Game rules (constants)
 
 All game math lives in `src/shared/config.ts` and `src/shared/instincts.ts`:
