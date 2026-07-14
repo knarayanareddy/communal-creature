@@ -49,5 +49,8 @@
   "scripts": {
     "build": "vite build",
     "dev": "vite build --watch"
+  },
+  "dev": {
+    "subreddit": "commune_critter_dev"
   }
 }
