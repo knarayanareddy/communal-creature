@@ -10,7 +10,11 @@ import {
   HEALTH_START,
   INHERITED_SLOT_COUNT,
 } from '../../shared/config';
-import { BUCKET_EFFECTS, findInstinctWord } from '../../shared/instincts';
+import {
+  BUCKET_EFFECTS,
+  findInstinctWord,
+  findProposedName,
+} from '../../shared/instincts';
 import type {
   ActionType,
   AncestorRecord,
@@ -49,7 +53,12 @@ export const newTraits = (): Traits => ({
 export const createCreatureState = (
   postId: string,
   generation: number,
-  inherited?: { traits: Traits; slots: TraitSlot[]; lineage: AncestorRecord[] }
+  inherited?: {
+    traits: Traits;
+    slots: TraitSlot[];
+    lineage: AncestorRecord[];
+    name?: string;
+  }
 ): CreatureState => {
   const traits = newTraits();
   const inheritedSlots: TraitSlot[] = [];
@@ -62,7 +71,7 @@ export const createCreatureState = (
   return {
     postId,
     generation,
-    name: randomName(),
+    name: inherited?.name ?? randomName(),
     bornAtMs: Date.now(),
     health: HEALTH_START,
     traits,
@@ -202,6 +211,25 @@ const pickInstinct = async (postId: string): Promise<Instinct | null> => {
     }
   } catch (error) {
     console.error(`pickInstinct failed for ${postId}:`, error);
+  }
+  return null;
+};
+
+export const pickSuccessorName = async (
+  postId: string
+): Promise<string | null> => {
+  if (!isT3(postId)) return null;
+  try {
+    const comments = await reddit
+      .getComments({ postId, limit: 50, sort: 'top' })
+      .all();
+    for (const comment of comments) {
+      if (!comment.body) continue;
+      const name = findProposedName(comment.body);
+      if (name) return name;
+    }
+  } catch (error) {
+    console.error(`pickSuccessorName failed for ${postId}:`, error);
   }
   return null;
 };

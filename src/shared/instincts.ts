@@ -124,6 +124,22 @@ export const INSTINCT_BLOCKLIST: readonly string[] = [
   'phone number',
 ];
 
+// Commenters can christen the next generation: the top-ranked comment
+// matching "name it X" / "call it X" (and passing the blocklist) names the
+// successor when the creature dies.
+const NAME_PATTERN = /\b(?:name|call)\s+(?:it|him|her|them)\s+([a-z]{2,15})\b/i;
+
+export const findProposedName = (text: string): string | null => {
+  const lower = text.toLowerCase();
+  for (const blocked of INSTINCT_BLOCKLIST) {
+    if (lower.includes(blocked)) return null;
+  }
+  const match = NAME_PATTERN.exec(text);
+  const raw = match?.[1];
+  if (!raw) return null;
+  return raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+};
+
 export const findInstinctWord = (
   text: string
 ): { bucket: InstinctBucket; word: string } | null => {

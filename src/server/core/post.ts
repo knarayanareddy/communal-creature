@@ -8,6 +8,7 @@ import type {
 import {
   createCreatureState,
   pickInheritedSlots,
+  pickSuccessorName,
   saveCreature,
 } from './creature';
 
@@ -28,7 +29,12 @@ export const markPostDead = async (postId: string): Promise<void> => {
 
 export const spawnCreaturePost = async (
   generation: number,
-  inherited?: { traits: Traits; slots: TraitSlot[]; lineage: AncestorRecord[] }
+  inherited?: {
+    traits: Traits;
+    slots: TraitSlot[];
+    lineage: AncestorRecord[];
+    name?: string;
+  }
 ) => {
   const post = await reddit.submitCustomPost({
     title:
@@ -52,10 +58,12 @@ export const spawnSuccessor = async (parent: CreatureState) => {
     daysSurvived: parent.dayNumber,
     passedOnSlots: slots,
   };
+  const proposedName = await pickSuccessorName(parent.postId);
   const { post, state } = await spawnCreaturePost(parent.generation + 1, {
     traits: parent.traits,
     slots,
     lineage: [...parent.lineage, ancestorRecord],
+    ...(proposedName ? { name: proposedName } : {}),
   });
   await markPostDead(parent.postId);
   return { post, state };

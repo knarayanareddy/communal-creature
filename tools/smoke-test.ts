@@ -7,7 +7,11 @@ import {
   FEED_GAIN_CAP,
   HEALTH_START,
 } from '../src/shared/config.ts';
-import { findInstinctWord, BUCKET_EFFECTS } from '../src/shared/instincts.ts';
+import {
+  findInstinctWord,
+  findProposedName,
+  BUCKET_EFFECTS,
+} from '../src/shared/instincts.ts';
 import { healthStage } from '../src/shared/stage.ts';
 
 // Health stage thresholds
@@ -33,6 +37,13 @@ assert.equal(findInstinctWord('nothing relevant here'), null);
 assert.equal(findInstinctWord('eat this, kys'), null);
 // Short-word guard: "no" style fragments never match
 assert.equal(findInstinctWord('no'), null);
+
+// Successor naming from comments
+assert.equal(findProposedName('please name it Sprocket!'), 'Sprocket');
+assert.equal(findProposedName('Call him ZAPPY when he hatches'), 'Zappy');
+assert.equal(findProposedName('great creature'), null);
+assert.equal(findProposedName('name it kys'), null);
+assert.equal(findProposedName('name it X'), null); // too short
 
 // Every bucket has an effect definition
 for (const bucket of ['ferocity', 'hunger', 'guardian', 'chaos'] as const) {

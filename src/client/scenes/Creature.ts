@@ -212,7 +212,9 @@ export class Creature extends Scene {
     this.statusText.setText(
       c.dead
         ? 'This creature has passed on. Its lineage continues in a new post.'
-        : `${this.actionsRemaining}/${ACTIONS_PER_DAY} actions left today - feed it, mutate it, or ward it`
+        : this.stage === 'dying'
+          ? `${this.actionsRemaining}/${ACTIONS_PER_DAY} actions left - feed it, or comment "name it ..." to christen its heir`
+          : `${this.actionsRemaining}/${ACTIONS_PER_DAY} actions left today - feed it, mutate it, or ward it`
     );
     if (c.lineage.length > 0 && !this.lineageButton) {
       this.lineageButton = this.add
