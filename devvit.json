@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developers.reddit.com/schema/config-file.v1.json",
+  "name": "commune-critter",
+  "post": {
+    "dir": "dist/client",
+    "entrypoints": {
+      "default": {
+        "inline": true,
+        "entry": "splash.html"
+      },
+      "game": {
+        "entry": "game.html"
+      }
+    }
+  },
+  "server": {
+    "dir": "dist/server",
+    "entry": "index.cjs"
+  },
+  "menu": {
+    "items": [
+      {
+        "label": "Hatch a new creature",
+        "description": "Spawn a fresh Generation 1 creature post",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/post-create"
+      },
+      {
+        "label": "Run overnight tick now",
+        "description": "Manually trigger the daily tick (testing/demo)",
+        "location": "subreddit",
+        "forUserType": "moderator",
+        "endpoint": "/internal/menu/run-tick"
+      }
+    ]
+  },
+  "scheduler": {
+    "tasks": {
+      "daily-tick": {
+        "endpoint": "/internal/scheduler/daily-tick",
+        "cron": "0 6 * * *"
+      }
+    }
+  },
+  "triggers": {
+    "onAppInstall": "/internal/triggers/on-app-install"
+  },
+  "scripts": {
+    "build": "vite build",
+    "dev": "vite build --watch"
+  }
+}
