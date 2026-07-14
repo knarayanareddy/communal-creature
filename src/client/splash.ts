@@ -5,6 +5,7 @@ const startButton = document.getElementById('start-button') as HTMLButtonElement
 const titleElement = document.getElementById('title') as HTMLHeadingElement;
 const statusElement = document.getElementById('status') as HTMLParagraphElement;
 const blobElement = document.getElementById('blob') as HTMLDivElement;
+const todayStatsElement = document.getElementById('today-stats') as HTMLParagraphElement;
 
 startButton.addEventListener('click', (e) => {
   requestExpandedMode(e, 'game');
@@ -24,6 +25,19 @@ async function init() {
     statusElement.textContent = c.dead
       ? 'Its lineage lives on in a newer post.'
       : `Health ${c.health}/100 (${data.stage}). ${data.actionsRemaining} actions left today.`;
+    if (!c.dead) {
+      const mutates = Object.values(data.counts.mutateVotes).reduce(
+        (a, b) => a + b,
+        0
+      );
+      const bits = [
+        `${data.counts.tenders} tending today`,
+        `${data.counts.feeds} feeds`,
+        `${mutates} mutate votes`,
+        `${data.counts.protects} wards`,
+      ];
+      todayStatsElement.textContent = bits.join(' · ');
+    }
     blobElement.style.backgroundColor = BODY_COLORS[c.traits.body] ?? '#8ad9a3';
     if (c.dead) blobElement.classList.add('dead');
     else if (data.stage === 'dying') blobElement.classList.add('dying');

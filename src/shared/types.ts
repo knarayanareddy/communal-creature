@@ -30,6 +30,14 @@ export type RevealCard = {
   summary: string;
 };
 
+export type AncestorRecord = {
+  name: string;
+  generation: number;
+  postId: string;
+  daysSurvived: number;
+  passedOnSlots: TraitSlot[];
+};
+
 export type CreatureState = {
   postId: string;
   generation: number;
@@ -43,6 +51,7 @@ export type CreatureState = {
   instinct: Instinct | null;
   lastReveal: RevealCard | null;
   inheritedSlots: TraitSlot[];
+  lineage: AncestorRecord[];
   dead: boolean;
   successorPostId: string | null;
 };
@@ -54,6 +63,7 @@ export type DayCounts = {
   mutateVotes: Record<TraitSlot, number>;
   protects: number;
   touches: Record<TraitSlot, number>;
+  tenders: number;
 };
 
 export type InitResponse = {

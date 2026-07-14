@@ -1,5 +1,10 @@
 import { redis, reddit, context } from '@devvit/web/server';
-import type { Traits, TraitSlot } from '../../shared/types';
+import type {
+  AncestorRecord,
+  CreatureState,
+  Traits,
+  TraitSlot,
+} from '../../shared/types';
 import {
   createCreatureState,
   pickInheritedSlots,
@@ -23,7 +28,7 @@ export const markPostDead = async (postId: string): Promise<void> => {
 
 export const spawnCreaturePost = async (
   generation: number,
-  inherited?: { traits: Traits; slots: TraitSlot[] }
+  inherited?: { traits: Traits; slots: TraitSlot[]; lineage: AncestorRecord[] }
 ) => {
   const post = await reddit.submitCustomPost({
     title:
@@ -38,16 +43,20 @@ export const spawnCreaturePost = async (
   return { post, state };
 };
 
-export const spawnSuccessor = async (
-  parentPostId: string,
-  parentGeneration: number,
-  parentTraits: Traits
-) => {
+export const spawnSuccessor = async (parent: CreatureState) => {
   const slots = pickInheritedSlots();
-  const { post, state } = await spawnCreaturePost(parentGeneration + 1, {
-    traits: parentTraits,
+  const ancestorRecord: AncestorRecord = {
+    name: parent.name,
+    generation: parent.generation,
+    postId: parent.postId,
+    daysSurvived: parent.dayNumber,
+    passedOnSlots: slots,
+  };
+  const { post, state } = await spawnCreaturePost(parent.generation + 1, {
+    traits: parent.traits,
     slots,
+    lineage: [...parent.lineage, ancestorRecord],
   });
-  await markPostDead(parentPostId);
+  await markPostDead(parent.postId);
   return { post, state };
 };

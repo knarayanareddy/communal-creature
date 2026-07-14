@@ -15,11 +15,7 @@ export const tickAllCreatures = async (): Promise<string[]> => {
         continue;
       }
       if (result.died) {
-        const { post, state } = await spawnSuccessor(
-          postId,
-          result.state.generation,
-          result.state.traits
-        );
+        const { post, state } = await spawnSuccessor(result.state);
         result.state.successorPostId = post.id;
         await saveCreature(result.state);
         log.push(

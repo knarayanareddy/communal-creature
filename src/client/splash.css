@@ -89,6 +89,13 @@
   color: #a5b4c4;
 }
 
+.today-stats {
+  font-size: 0.85em;
+  text-align: center;
+  color: #7ee787;
+  min-height: 1em;
+}
+
 .start-button {
   background-color: #d93900;
   color: #ffffff;

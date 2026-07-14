@@ -4,6 +4,7 @@ import { ACTIONS_PER_DAY } from '../../shared/config';
 import type {
   ActResponse,
   CreatureState,
+  DayCounts,
   HealthStage,
   InitResponse,
   TraitSlot,
@@ -12,6 +13,7 @@ import { TRAIT_SLOTS } from '../../shared/types';
 
 const REF_W = 1024;
 const REF_H = 768;
+const PORTRAIT_REF_W = 640;
 
 const AURA_COLORS = [0x7ee787, 0x79c0ff, 0xff9bce, 0xffd66e];
 const BODY_COLORS = [0x8ad9a3, 0x86b9e8, 0xe8a0c4, 0xe8cc8a];
@@ -37,15 +39,29 @@ export class Creature extends Scene {
   private statusText: Phaser.GameObjects.Text;
   private toastText: Phaser.GameObjects.Text;
   private healthBarFill: Phaser.GameObjects.Rectangle;
+  private healthBarBg: Phaser.GameObjects.Rectangle;
   private healthBarMax = 320;
   private healthLabel: Phaser.GameObjects.Text;
   private nameText: Phaser.GameObjects.Text;
   private instinctText: Phaser.GameObjects.Text;
+  private todayText: Phaser.GameObjects.Text;
+  private counts: DayCounts | null = null;
   private creatureContainer: Phaser.GameObjects.Container;
   private bobTween: Phaser.Tweens.Tween | null = null;
   private particles: Phaser.GameObjects.Particles.ParticleEmitter | null = null;
-  private uiObjects: Phaser.GameObjects.GameObject[] = [];
   private slotPicker: Phaser.GameObjects.Container | null = null;
+  private actionButtons: {
+    bg: Phaser.GameObjects.Rectangle;
+    label: Phaser.GameObjects.Text;
+    index: number;
+  }[] = [];
+  private portrait = false;
+  private viewTop = 0;
+  private viewBottom = REF_H;
+  private audioCtx: AudioContext | null = null;
+  private hatched = false;
+  private lineageButton: Phaser.GameObjects.Text | null = null;
+  private lineagePanel: Phaser.GameObjects.Container | null = null;
 
   constructor() {
     super('Creature');
@@ -73,7 +89,7 @@ export class Creature extends Scene {
       })
       .setOrigin(0.5);
 
-    this.add
+    this.healthBarBg = this.add
       .rectangle(REF_W / 2, 120, this.healthBarMax + 4, 22, 0x0a121b)
       .setStrokeStyle(2, 0x30363d);
     this.healthBarFill = this.add
@@ -86,6 +102,14 @@ export class Creature extends Scene {
         fontSize: 17,
         color: '#a5b4c4',
         fontStyle: 'italic',
+      })
+      .setOrigin(0.5);
+
+    this.todayText = this.add
+      .text(REF_W / 2, 178, '', {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: 16,
+        color: '#7ee787',
       })
       .setOrigin(0.5);
 
@@ -135,6 +159,7 @@ export class Creature extends Scene {
       this.creature = data.creature;
       this.stage = data.stage;
       this.actionsRemaining = data.actionsRemaining;
+      this.counts = data.counts;
       this.refresh();
       if (data.creature.lastReveal && data.creature.dayNumber > 1) {
         this.showRevealCard();
@@ -173,12 +198,83 @@ export class Creature extends Scene {
         'No instinct yet - the top comment tonight shapes what it becomes'
       );
     }
+    if (this.counts && !c.dead) {
+      const mutates = Object.values(this.counts.mutateVotes).reduce(
+        (a, b) => a + b,
+        0
+      );
+      this.todayText.setText(
+        `Today: ${this.counts.tenders} tending · ${this.counts.feeds} feeds · ${mutates} mutate votes · ${this.counts.protects} wards`
+      );
+    } else {
+      this.todayText.setText('');
+    }
     this.statusText.setText(
       c.dead
         ? 'This creature has passed on. Its lineage continues in a new post.'
         : `${this.actionsRemaining}/${ACTIONS_PER_DAY} actions left today - feed it, mutate it, or ward it`
     );
+    if (c.lineage.length > 0 && !this.lineageButton) {
+      this.lineageButton = this.add
+        .text(REF_W / 2, 0, 'VIEW LINEAGE', {
+          fontFamily: 'Trebuchet MS, sans-serif',
+          fontSize: 15,
+          color: '#e6edf3',
+          backgroundColor: '#1f2c3a',
+          padding: { x: 12, y: 6 },
+        })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true });
+      this.lineageButton.on('pointerdown', () => this.toggleLineagePanel());
+      this.layout(this.scale.width, this.scale.height);
+    }
     this.drawCreature();
+  }
+
+  private toggleLineagePanel() {
+    if (this.lineagePanel) {
+      this.lineagePanel.destroy();
+      this.lineagePanel = null;
+      return;
+    }
+    const c = this.creature;
+    if (!c) return;
+    const lines = c.lineage.map(
+      (a) =>
+        `Gen ${a.generation}: ${a.name} - survived ${a.daysSurvived} days, passed on ${a.passedOnSlots.join(' + ')}`
+    );
+    lines.push(`Gen ${c.generation}: ${c.name} - ${c.dead ? 'passed on' : 'alive today'}`);
+    const panelH = 120 + lines.length * 30;
+    const container = this.add.container(REF_W / 2, REF_H / 2);
+    const dim = this.add
+      .rectangle(0, 0, REF_W * 2, REF_H * 2, 0x000000, 0.6)
+      .setInteractive();
+    const card = this.add
+      .rectangle(0, 0, this.portrait ? 600 : 680, panelH, 0x16212e)
+      .setStrokeStyle(3, 0x7ee787, 0.7);
+    const title = this.add
+      .text(0, -panelH / 2 + 36, 'The bloodline', {
+        fontFamily: 'Georgia, serif',
+        fontSize: 26,
+        color: '#e6edf3',
+      })
+      .setOrigin(0.5);
+    const body = this.add
+      .text(0, 10, lines.join('\n'), {
+        fontFamily: 'Trebuchet MS, sans-serif',
+        fontSize: 17,
+        color: '#a5b4c4',
+        align: 'center',
+        wordWrap: { width: this.portrait ? 540 : 620 },
+        lineSpacing: 12,
+      })
+      .setOrigin(0.5);
+    dim.on('pointerdown', () => {
+      container.destroy();
+      this.lineagePanel = null;
+    });
+    container.add([dim, card, title, body]);
+    this.lineagePanel = container;
   }
 
   private drawCreature() {
@@ -248,6 +344,18 @@ export class Creature extends Scene {
         yoyo: true,
         repeat: -1,
         ease: 'Sine.easeInOut',
+      });
+    }
+
+    if (!this.hatched && !dead) {
+      this.hatched = true;
+      this.creatureContainer.setScale(0.1, 0.1);
+      this.tweens.add({
+        targets: this.creatureContainer,
+        scaleX: 1,
+        scaleY: 1,
+        duration: 700,
+        ease: 'Back.easeOut',
       });
     }
 
@@ -355,18 +463,18 @@ export class Creature extends Scene {
   }
 
   private buildActionButtons() {
-    const defs: { label: string; action: 'feed' | 'mutate' | 'protect'; x: number; color: number }[] = [
-      { label: 'FEED', action: 'feed', x: REF_W / 2 - 220, color: 0x2e7d4f },
-      { label: 'MUTATE', action: 'mutate', x: REF_W / 2, color: 0x6b4fa0 },
-      { label: 'PROTECT', action: 'protect', x: REF_W / 2 + 220, color: 0x2a6b9c },
+    const defs: { label: string; action: 'feed' | 'mutate' | 'protect'; color: number }[] = [
+      { label: 'FEED', action: 'feed', color: 0x2e7d4f },
+      { label: 'MUTATE', action: 'mutate', color: 0x6b4fa0 },
+      { label: 'PROTECT', action: 'protect', color: 0x2a6b9c },
     ];
-    for (const def of defs) {
+    defs.forEach((def, index) => {
       const bg = this.add
-        .rectangle(def.x, REF_H - 110, 180, 62, def.color)
+        .rectangle(REF_W / 2, REF_H - 110, 180, 62, def.color)
         .setStrokeStyle(2, 0xe6edf3, 0.4)
         .setInteractive({ useHandCursor: true });
       const label = this.add
-        .text(def.x, REF_H - 110, def.label, {
+        .text(REF_W / 2, REF_H - 110, def.label, {
           fontFamily: 'Trebuchet MS, sans-serif',
           fontSize: 24,
           color: '#e6edf3',
@@ -382,8 +490,8 @@ export class Creature extends Scene {
           void this.act(def.action, undefined);
         }
       });
-      this.uiObjects.push(bg, label);
-    }
+      this.actionButtons.push({ bg, label, index });
+    });
   }
 
   private showSlotPicker() {
@@ -392,13 +500,15 @@ export class Creature extends Scene {
       this.slotPicker = null;
       return;
     }
-    const container = this.add.container(REF_W / 2, REF_H - 235);
+    const pickerY = this.portrait ? this.viewBottom - 320 : this.viewBottom - 235;
+    const pickerW = this.portrait ? 600 : 640;
+    const container = this.add.container(REF_W / 2, pickerY);
     const bg = this.add
-      .rectangle(0, 0, 640, 84, 0x1f2c3a)
+      .rectangle(0, 0, pickerW, this.portrait ? 150 : 84, 0x1f2c3a)
       .setStrokeStyle(2, 0x30363d);
     container.add(bg);
     const title = this.add
-      .text(0, -28, 'Which trait should mutate tonight?', {
+      .text(0, this.portrait ? -55 : -28, 'Which trait should mutate tonight?', {
         fontFamily: 'Trebuchet MS, sans-serif',
         fontSize: 16,
         color: '#a5b4c4',
@@ -406,14 +516,15 @@ export class Creature extends Scene {
       .setOrigin(0.5);
     container.add(title);
     TRAIT_SLOTS.forEach((slot, i) => {
-      const x = -240 + i * 160;
+      const x = this.portrait ? -150 + (i % 2) * 300 : -240 + i * 160;
+      const y = this.portrait ? (i < 2 ? -10 : 45) : 14;
       const button = this.add
-        .text(x, 14, slot.toUpperCase(), {
+        .text(x, y, slot.toUpperCase(), {
           fontFamily: 'Trebuchet MS, sans-serif',
           fontSize: 18,
           color: '#e6edf3',
           backgroundColor: '#6b4fa0',
-          padding: { x: 16, y: 7 },
+          padding: { x: 20, y: 10 },
         })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true });
@@ -429,6 +540,29 @@ export class Creature extends Scene {
     this.slotPicker = container;
   }
 
+  private playTone(freqs: number[], duration = 0.12, type: OscillatorType = 'sine') {
+    try {
+      this.audioCtx ??= new AudioContext();
+      const ctx = this.audioCtx;
+      if (ctx.state === 'suspended') void ctx.resume();
+      freqs.forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = type;
+        osc.frequency.value = freq;
+        const start = ctx.currentTime + i * duration;
+        gain.gain.setValueAtTime(0.12, start);
+        gain.gain.exponentialRampToValueAtTime(0.001, start + duration);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(start);
+        osc.stop(start + duration);
+      });
+    } catch {
+      // audio is best-effort; never break gameplay over it
+    }
+  }
+
   private async act(action: 'feed' | 'mutate' | 'protect', slot: TraitSlot | undefined) {
     try {
       const response = await fetch('/api/act', {
@@ -438,12 +572,17 @@ export class Creature extends Scene {
       });
       const data = (await response.json()) as ActResponse | { status: 'error'; message: string };
       if ('status' in data) {
+        this.playTone([160], 0.18, 'square');
         this.showToast(data.message);
         return;
       }
+      if (action === 'feed') this.playTone([523, 659, 784]);
+      else if (action === 'mutate') this.playTone([392, 466], 0.14, 'triangle');
+      else this.playTone([587, 880], 0.16);
       this.creature = data.creature;
       this.stage = data.stage;
       this.actionsRemaining = data.actionsRemaining;
+      this.counts = data.counts;
       this.refresh();
       this.showToast(data.message);
       this.pulseCreature();
@@ -518,13 +657,60 @@ export class Creature extends Scene {
     container.add([dim, card, title, body, close]);
     container.setAlpha(0);
     this.tweens.add({ targets: container, alpha: 1, duration: 350 });
+    if (reveal.mutatedSlot) {
+      this.cameras.main.shake(280, 0.004);
+    }
+    this.playTone(reveal.died ? [220, 165, 110] : [440, 554, 659], 0.16);
   }
 
   private layout(width: number, height: number) {
     this.cameras.resize(width, height);
-    const zoom = Math.min(width / REF_W, height / REF_H);
+    this.portrait = height > width;
+    const refW = this.portrait ? PORTRAIT_REF_W : REF_W;
+    const zoom = this.portrait
+      ? width / refW
+      : Math.min(width / REF_W, height / REF_H);
     this.cameras.main.setZoom(zoom);
     this.cameras.main.centerOn(REF_W / 2, REF_H / 2);
+
+    const viewH = height / zoom;
+    this.viewTop = REF_H / 2 - viewH / 2;
+    this.viewBottom = REF_H / 2 + viewH / 2;
+    const top = this.viewTop;
+    const bottom = this.viewBottom;
+
+    this.nameText.setY(top + 46);
+    this.nameText.setFontSize(this.portrait ? 30 : 40);
+    this.nameText.setWordWrapWidth(this.portrait ? 560 : 900);
+    this.healthLabel.setY(top + (this.portrait ? 96 : 92));
+    this.healthBarBg.setY(top + (this.portrait ? 126 : 120));
+    this.healthBarFill.setY(top + (this.portrait ? 126 : 120));
+    this.instinctText.setY(top + (this.portrait ? 160 : 150));
+    this.instinctText.setWordWrapWidth(this.portrait ? 560 : 900);
+    this.todayText.setY(top + (this.portrait ? 196 : 178));
+    this.todayText.setWordWrapWidth(this.portrait ? 560 : 900);
+    if (this.lineageButton) {
+      this.lineageButton.setY(top + (this.portrait ? 234 : 212));
+    }
+    this.statusText.setY(bottom - 36);
+    this.statusText.setWordWrapWidth(this.portrait ? 560 : 900);
+    this.toastText.setY(bottom - (this.portrait ? 300 : 200));
+    this.toastText.setWordWrapWidth(this.portrait ? 560 : 700);
+
+    const buttonY = bottom - (this.portrait ? 110 : 110);
+    const spacing = this.portrait ? 200 : 220;
+    for (const { bg, label, index } of this.actionButtons) {
+      const x = REF_W / 2 + (index - 1) * spacing;
+      bg.setPosition(x, buttonY);
+      bg.setSize(this.portrait ? 190 : 180, this.portrait ? 84 : 62);
+      label.setPosition(x, buttonY);
+      label.setFontSize(this.portrait ? 26 : 24);
+    }
+
+    if (this.slotPicker) {
+      this.slotPicker.destroy();
+      this.slotPicker = null;
+    }
   }
 
   private desaturate(color: number, saturation: number): number {

@@ -13,6 +13,7 @@ import {
 import { BUCKET_EFFECTS, findInstinctWord } from '../../shared/instincts';
 import type {
   ActionType,
+  AncestorRecord,
   CreatureState,
   DayCounts,
   Instinct,
@@ -48,7 +49,7 @@ export const newTraits = (): Traits => ({
 export const createCreatureState = (
   postId: string,
   generation: number,
-  inherited?: { traits: Traits; slots: TraitSlot[] }
+  inherited?: { traits: Traits; slots: TraitSlot[]; lineage: AncestorRecord[] }
 ): CreatureState => {
   const traits = newTraits();
   const inheritedSlots: TraitSlot[] = [];
@@ -71,6 +72,7 @@ export const createCreatureState = (
     instinct: null,
     lastReveal: null,
     inheritedSlots,
+    lineage: inherited?.lineage ?? [],
     dead: false,
     successorPostId: null,
   };
@@ -81,7 +83,9 @@ export const getCreature = async (
 ): Promise<CreatureState | null> => {
   const raw = await redis.get(creatureKey(postId));
   if (!raw) return null;
-  return JSON.parse(raw) as CreatureState;
+  const state = JSON.parse(raw) as CreatureState;
+  if (!state.lineage) state.lineage = [];
+  return state;
 };
 
 export const saveCreature = async (state: CreatureState): Promise<void> => {
@@ -93,6 +97,7 @@ const emptyCounts = (): DayCounts => ({
   mutateVotes: { body: 0, eyes: 0, limbs: 0, aura: 0 },
   protects: 0,
   touches: { body: 0, eyes: 0, limbs: 0, aura: 0 },
+  tenders: 0,
 });
 
 export const getDayCounts = async (
@@ -104,6 +109,7 @@ export const getDayCounts = async (
   if (!raw) return counts;
   counts.feeds = parseInt(raw['feeds'] ?? '0') || 0;
   counts.protects = parseInt(raw['protects'] ?? '0') || 0;
+  counts.tenders = parseInt(raw['tenders'] ?? '0') || 0;
   for (const slot of TRAIT_SLOTS) {
     counts.mutateVotes[slot] = parseInt(raw[`mutate:${slot}`] ?? '0') || 0;
     counts.touches[slot] = parseInt(raw[`touch:${slot}`] ?? '0') || 0;
@@ -142,6 +148,9 @@ export const applyAction = async (
   }
 
   const cKey = countsKey(postId, day);
+  if (used === 0) {
+    await redis.hIncrBy(cKey, 'tenders', 1);
+  }
   let message: string;
   if (action === 'feed') {
     await redis.hIncrBy(cKey, 'feeds', 1);
@@ -267,6 +276,13 @@ export const runTick = async (postId: string): Promise<TickResult | null> => {
   state.lastTickDay = todayKey();
 
   const parts: string[] = [];
+  if (counts.tenders > 0) {
+    parts.push(
+      counts.tenders === 1
+        ? '1 redditor tended it'
+        : `${counts.tenders} redditors tended it`
+    );
+  }
   parts.push(
     counts.feeds > 0
       ? `Fed ${counts.feeds}x (+${feedGain} health)`
